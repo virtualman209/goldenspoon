@@ -80,15 +80,16 @@
   .item{background:var(--card);border-radius:14px;overflow:hidden;}
   .item .media{width:100%;background:#000;}
   .item .media img,.item .media video{width:100%;display:block;max-height:60vh;object-fit:contain;}
-  .item .meta{display:flex;align-items:center;justify-content:space-between;
-    padding:10px 14px;gap:10px;}
+  .item .meta{display:flex;flex-direction:column;align-items:stretch;
+    padding:12px 14px;gap:12px;}
   .item .meta .info{min-width:0;}
   .item .meta .name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;
     text-overflow:ellipsis;}
   .item .meta .time{font-size:12px;color:var(--muted);margin-top:2px;}
-  .item .acts{display:flex;gap:8px;flex-shrink:0;}
-  .item .acts button{border:none;border-radius:9px;padding:9px 12px;font-size:13px;
+  .item .acts{display:flex;gap:10px;}
+  .item .acts button{flex:1;border:none;border-radius:11px;padding:14px 12px;font-size:15px;
     font-weight:600;cursor:pointer;white-space:nowrap;}
+  .item .acts button:active{transform:scale(.96);}
   .exp{background:var(--accent);color:#fff;}
   .del{background:#3a2a2a;color:#ff6b60;}
   #libEmpty{color:var(--muted);text-align:center;margin:60px 20px;font-size:15px;line-height:1.6;}
@@ -274,7 +275,11 @@
     setTimeout(()=>URL.revokeObjectURL(url),4000);
   }
   async function delItem(id,card){
-    await dbDel(id); card.remove(); refreshCount();
+    try{
+      await dbDel(id);
+    }catch(e){ toast("Xoá thất bại: "+(e.message||e)); return; }
+    card.remove(); refreshCount();
+    toast("✓ Đã xoá");
     if(!$("#libList").children.length){
       $("#libList").innerHTML='<div id="libEmpty">Chưa có gì.</div>';
       $("#libClear").disabled=true;
