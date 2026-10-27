@@ -77,22 +77,33 @@
     padding:9px 16px;font-size:15px;font-weight:600;cursor:pointer;}
   #libList{flex:1;overflow-y:auto;padding:14px 14px max(30px,env(safe-area-inset-bottom));
     display:flex;flex-direction:column;gap:14px;-webkit-overflow-scrolling:touch;}
-  .item{background:var(--card);border-radius:14px;overflow:hidden;}
-  .item .media{width:100%;background:#000;}
-  .item .media img,.item .media video{width:100%;display:block;max-height:60vh;object-fit:contain;}
-  .item .meta{display:flex;flex-direction:column;align-items:stretch;
-    padding:12px 14px;gap:12px;}
-  .item .meta .info{min-width:0;}
-  .item .meta .name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;
-    text-overflow:ellipsis;}
-  .item .meta .time{font-size:12px;color:var(--muted);margin-top:2px;}
-  .item .acts{display:flex;gap:10px;}
-  .item .acts button{flex:1;border:none;border-radius:11px;padding:14px 12px;font-size:15px;
+  .item{background:var(--card);border-radius:14px;padding:12px;display:flex;
+    flex-direction:column;gap:12px;}
+  .item .row{display:flex;align-items:center;gap:12px;}
+  .item .thumb{width:52px;height:52px;border-radius:10px;background:#000;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;font-size:24px;overflow:hidden;}
+  .item .thumb img{width:100%;height:100%;object-fit:cover;}
+  .item .info{min-width:0;flex:1;}
+  .item .name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .item .time{font-size:12px;color:var(--muted);margin-top:3px;}
+  .item .acts{display:flex;gap:8px;}
+  .item .acts button{flex:1;border:none;border-radius:11px;padding:13px 8px;font-size:15px;
     font-weight:600;cursor:pointer;white-space:nowrap;}
   .item .acts button:active{transform:scale(.96);}
+  .view{background:#2c2c2e;color:#fff;}
   .exp{background:var(--accent);color:#fff;}
   .del{background:#3a2a2a;color:#ff6b60;}
   #libEmpty{color:var(--muted);text-align:center;margin:60px 20px;font-size:15px;line-height:1.6;}
+
+  /* fullscreen viewer */
+  #viewer{position:fixed;inset:0;z-index:70;background:#000;display:none;
+    flex-direction:column;}
+  #viewer.show{display:flex;}
+  #viewerClose{position:absolute;top:max(14px,env(safe-area-inset-top));right:16px;z-index:2;
+    width:44px;height:44px;border-radius:50%;border:none;background:rgba(50,50,52,.9);
+    color:#fff;font-size:22px;cursor:pointer;}
+  #viewerBody{flex:1;display:flex;align-items:center;justify-content:center;padding:10px;}
+  #viewerBody img,#viewerBody video{max-width:100%;max-height:100%;border-radius:10px;}
 
   /* blackout */
   #blackout{position:fixed;inset:0;z-index:60;background:#000;display:none;}
@@ -160,6 +171,12 @@
     </div>
   </div>
   <div id="libList"></div>
+</div>
+
+<!-- fullscreen viewer -->
+<div id="viewer">
+  <button id="viewerClose">✕</button>
+  <div id="viewerBody"></div>
 </div>
 
 <div id="blackout"><div id="tapHint">Chạm 2 lần để hiện lại</div></div>
@@ -236,22 +253,25 @@
       list.innerHTML='<div id="libEmpty">Chưa có gì.<br>Ảnh và video bạn chụp/quay sẽ nằm ở đây — chỉ app này mở được.</div>';
     } else {
       for(const it of items){
-        const url=URL.createObjectURL(it.blob); libUrls.push(url);
         const card=document.createElement("div"); card.className="item";
         const d=new Date(it.time);
         const t=d.toLocaleString("vi-VN",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
-        const mediaHtml = it.kind==="video"
-          ? `<video src="${url}" controls playsinline preload="metadata"></video>`
-          : `<img src="${url}" loading="lazy">`;
+        let thumbHtml = it.kind==="video" ? "🎬" : "🖼️";
+        if(it.kind==="image"){
+          const url=URL.createObjectURL(it.blob); libUrls.push(url);
+          thumbHtml = `<img src="${url}" loading="lazy">`;
+        }
         card.innerHTML=`
-          <div class="media">${mediaHtml}</div>
-          <div class="meta">
+          <div class="row">
+            <div class="thumb">${thumbHtml}</div>
             <div class="info"><div class="name">${it.name}</div><div class="time">${t}</div></div>
-            <div class="acts">
-              <button class="exp">Xuất ra Ảnh</button>
-              <button class="del">Xoá</button>
-            </div>
+          </div>
+          <div class="acts">
+            <button class="view">Xem</button>
+            <button class="exp">Xuất</button>
+            <button class="del">Xoá</button>
           </div>`;
+        card.querySelector(".view").addEventListener("click",()=>openViewer(it));
         card.querySelector(".exp").addEventListener("click",()=>exportToPhotos(it));
         card.querySelector(".del").addEventListener("click",()=>delItem(it.id,card));
         list.appendChild(card);
@@ -263,6 +283,26 @@
     $("#library").classList.remove("show");
     libUrls.forEach(u=>URL.revokeObjectURL(u)); libUrls=[];
     $("#libList").innerHTML="";
+  }
+  let viewerUrl=null;
+  function openViewer(it){
+    const body=$("#viewerBody"); body.innerHTML="";
+    if(viewerUrl){ URL.revokeObjectURL(viewerUrl); viewerUrl=null; }
+    viewerUrl=URL.createObjectURL(it.blob);
+    let el;
+    if(it.kind==="video"){
+      el=document.createElement("video");
+      el.src=viewerUrl; el.controls=true; el.playsInline=true; el.autoplay=true;
+    } else {
+      el=document.createElement("img"); el.src=viewerUrl;
+    }
+    body.appendChild(el);
+    $("#viewer").classList.add("show");
+  }
+  function closeViewer(){
+    $("#viewer").classList.remove("show");
+    $("#viewerBody").innerHTML="";
+    if(viewerUrl){ URL.revokeObjectURL(viewerUrl); viewerUrl=null; }
   }
   async function exportToPhotos(it){
     const file=new File([it.blob], it.name, {type:it.type});
@@ -419,6 +459,7 @@
   $("#libBtn").addEventListener("click", openLibrary);
   $("#libClose").addEventListener("click", closeLibrary);
   $("#libClear").addEventListener("click", clearAll);
+  $("#viewerClose").addEventListener("click", closeViewer);
   window.addEventListener("pagehide", stop);
 
   refreshCount();
